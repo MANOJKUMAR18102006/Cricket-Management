@@ -13,6 +13,10 @@ import ConnectionsPage from '../pages/ConnectionsPage';
 import MatchesPage from '../pages/MatchesPage';
 import CreateMatchPage from '../pages/CreateMatchPage';
 import MatchDetailPage from '../pages/MatchDetailPage';
+import TeamsPage from '../pages/TeamsPage';
+import CreateTeamPage from '../pages/CreateTeamPage';
+import TeamDetailPage from '../pages/TeamDetailPage';
+import EditTeamPage from '../pages/EditTeamPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 export default function AppRoutes() {
@@ -29,6 +33,8 @@ export default function AppRoutes() {
             <Route path="players/:id" element={<PlayerDetailPage />} />
             <Route path="matches" element={<MatchesPage />} />
             <Route path="matches/:id" element={<MatchDetailPage />} />
+            <Route path="teams" element={<TeamsPage />} />
+            <Route path="teams/:id" element={<TeamDetailPage />} />
 
             {/* Protected Routes */}
             <Route
@@ -60,6 +66,22 @@ export default function AppRoutes() {
               element={
                 <ProtectedRoute>
                   <CreateMatchPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="teams/create"
+              element={
+                <ProtectedRoute>
+                  <CreateTeamPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="teams/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <EditTeamPage />
                 </ProtectedRoute>
               }
             />

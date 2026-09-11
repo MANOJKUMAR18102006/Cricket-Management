@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import matchService from '../services/matchService';
+import teamService from '../services/teamService';
 import { 
   PlusCircle, 
   ArrowLeft, 
@@ -37,8 +38,23 @@ export default function CreateMatchPage() {
     status: 'scheduled',
   });
 
+  const [availableTeams, setAvailableTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const res = await teamService.getTeams({ limit: 50 });
+        if (res.success && res.teams) {
+          setAvailableTeams(res.teams);
+        }
+      } catch (err) {
+        // Silently fail to allow typing custom team names
+      }
+    };
+    fetchTeams();
+  }, []);
 
   const handleFormatChange = (fmtId) => {
     const selected = FORMATS.find((f) => f.id === fmtId);
@@ -161,6 +177,7 @@ export default function CreateMatchPage() {
                 id="team1"
                 type="text"
                 name="team1"
+                list="registered-teams-list"
                 value={formData.team1}
                 onChange={handleChange}
                 placeholder="e.g. Royal Challengers"
@@ -177,6 +194,7 @@ export default function CreateMatchPage() {
                 id="team2"
                 type="text"
                 name="team2"
+                list="registered-teams-list"
                 value={formData.team2}
                 onChange={handleChange}
                 placeholder="e.g. Mumbai Indians"
@@ -185,6 +203,15 @@ export default function CreateMatchPage() {
               />
             </div>
           </div>
+
+          {/* Datalist of registered teams for quick autocompletion */}
+          <datalist id="registered-teams-list">
+            {availableTeams.map((t) => (
+              <option key={t._id} value={t.name}>
+                {t.city ? `${t.name} (${t.city})` : t.name}
+              </option>
+            ))}
+          </datalist>
         </div>
 
         {/* Section 2: Format & Overs */}

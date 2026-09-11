@@ -48,7 +48,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Matches', path: '/matches', icon: Activity },
-    { name: 'Tournaments', path: '/#tournaments', icon: Trophy },
+    { name: 'Teams', path: '/teams', icon: Shield },
     { name: 'Players & Stats', path: '/players', icon: Users },
   ];
 
