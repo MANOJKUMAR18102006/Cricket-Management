@@ -13,6 +13,7 @@ import ConnectionsPage from '../pages/ConnectionsPage';
 import MatchesPage from '../pages/MatchesPage';
 import CreateMatchPage from '../pages/CreateMatchPage';
 import MatchDetailPage from '../pages/MatchDetailPage';
+import LiveScoringPage from '../pages/LiveScoringPage';
 import TeamsPage from '../pages/TeamsPage';
 import CreateTeamPage from '../pages/CreateTeamPage';
 import TeamDetailPage from '../pages/TeamDetailPage';
@@ -66,6 +67,14 @@ export default function AppRoutes() {
               element={
                 <ProtectedRoute>
                   <CreateMatchPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="matches/:id/score"
+              element={
+                <ProtectedRoute>
+                  <LiveScoringPage />
                 </ProtectedRoute>
               }
             />

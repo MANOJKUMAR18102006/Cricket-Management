@@ -83,6 +83,18 @@ const matchSchema = new mongoose.Schema(
       trim: true,
       maxlength: [200, 'Result message cannot exceed 200 characters'],
     },
+    currentInningsNumber: {
+      type: Number,
+      enum: [1, 2],
+      default: 1,
+    },
+    liveScore: {
+      team: { type: String, default: '' },
+      runs: { type: Number, default: 0 },
+      wickets: { type: Number, default: 0 },
+      overs: { type: String, default: '0.0' },
+      target: { type: Number, default: null },
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import matchService from '../services/matchService';
+import scoringService from '../services/scoringService';
 import { useAuth } from '../context/AuthContext';
 import { 
   ArrowLeft, 
@@ -26,6 +27,8 @@ export default function MatchDetailPage() {
   const { user } = useAuth();
 
   const [match, setMatch] = useState(null);
+  const [inningsList, setInningsList] = useState([]);
+  const [activeScorecardInnings, setActiveScorecardInnings] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -56,6 +59,19 @@ export default function MatchDetailPage() {
           winner: data.match.winner || '',
           result: data.match.result || '',
         });
+
+        // Also fetch live scoring state
+        try {
+          const scoringData = await scoringService.getMatchScoringState(id);
+          if (scoringData.success && scoringData.inningsList) {
+            setInningsList(scoringData.inningsList);
+            if (scoringData.currentInnings) {
+              setActiveScorecardInnings(scoringData.currentInnings.inningsNumber);
+            }
+          }
+        } catch (scoreErr) {
+          // Silently ignore if not scored yet
+        }
       } else {
         setError('Match not found.');
       }
@@ -170,12 +186,19 @@ export default function MatchDetailPage() {
 
           {isCreator && (
             <div className="flex items-center gap-2">
+              <Link
+                to={`/matches/${match._id}/score`}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-black bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-500 hover:to-teal-400 transition shadow-md shadow-emerald-500/20"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Live Scoring</span>
+              </Link>
               <button
                 onClick={() => setShowEditModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-md shadow-emerald-500/20"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gray-800 hover:bg-gray-700 transition border border-gray-700"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Manage Match</span>
+                <span>Manage</span>
               </button>
               <button
                 onClick={handleDeleteMatch}
@@ -330,23 +353,164 @@ export default function MatchDetailPage() {
 
       </div>
 
-      {/* Scoring Phase Placeholder Notice */}
-      <div className="rounded-2xl bg-[#0c1220] border border-gray-800 p-6 flex items-start gap-4">
-        <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
-          <Activity className="w-6 h-6" />
+      {/* Live Ball-by-Ball Scorecard Component */}
+      <div className="rounded-3xl bg-[#0c1220] border border-gray-800 p-6 sm:p-8 space-y-6 mb-8 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Ball-by-Ball Match Scorecard</h3>
+              <p className="text-xs text-gray-400">Official digital innings breakdown and player statistics</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {inningsList.map((inn) => (
+              <button
+                key={inn._id}
+                onClick={() => setActiveScorecardInnings(inn.inningsNumber)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition ${
+                  activeScorecardInnings === inn.inningsNumber
+                    ? 'bg-emerald-500 text-black shadow'
+                    : 'bg-gray-850 text-gray-400 hover:text-white'
+                }`}
+              >
+                Innings {inn.inningsNumber}: {inn.totalRuns}/{inn.wickets}
+              </button>
+            ))}
+
+            {isCreator && (
+              <Link
+                to={`/matches/${match._id}/score`}
+                className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-black font-bold text-xs rounded-xl shadow hover:from-emerald-400 hover:to-teal-300 transition flex items-center gap-1.5"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Live Scoring Console</span>
+              </Link>
+            )}
+          </div>
         </div>
-        <div>
-          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>Digital Ball-by-Ball Live Scoring System</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-              Next Phase Module
-            </span>
-          </h4>
-          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-            Match metadata, fixture schedules, team rosters, and outcome management are active. 
-            Live digital ball-by-ball score recording, overs progression, wagon wheels, and extras will be activated in the scoring engine update.
-          </p>
-        </div>
+
+        {/* Selected Innings Scorecard Table */}
+        {(() => {
+          const selectedInnings = inningsList.find((i) => i.inningsNumber === activeScorecardInnings) || inningsList[0];
+
+          if (!selectedInnings || !selectedInnings.batsmen || selectedInnings.batsmen.length === 0) {
+            return (
+              <div className="text-center py-10 space-y-3">
+                <Sparkles className="w-10 h-10 text-emerald-400 mx-auto" />
+                <h4 className="text-base font-bold text-white">No Innings Scored Yet</h4>
+                <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                  {isCreator
+                    ? 'Launch the Live Scoring Console to start recording ball-by-ball deliveries for this match.'
+                    : 'The match scorer has not commenced digital scoring for this fixture yet.'}
+                </p>
+                {isCreator && (
+                  <Link
+                    to={`/matches/${match._id}/score`}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl shadow transition"
+                  >
+                    <Activity className="w-4 h-4" />
+                    <span>Launch Scoring Console</span>
+                  </Link>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-6">
+              {/* Batting Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    {selectedInnings.battingTeam} Batting
+                  </h4>
+                  <span className="text-xs font-mono font-bold text-white">
+                    {selectedInnings.totalRuns}/{selectedInnings.wickets} ({selectedInnings.overs} ov)
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-gray-800 text-gray-400 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 pr-4">Batter</th>
+                        <th className="py-2.5 px-3">Dismissal</th>
+                        <th className="py-2.5 px-2 text-right">R</th>
+                        <th className="py-2.5 px-2 text-right">B</th>
+                        <th className="py-2.5 px-2 text-right">4s</th>
+                        <th className="py-2.5 px-2 text-right">6s</th>
+                        <th className="py-2.5 pl-3 text-right">SR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60 font-mono">
+                      {selectedInnings.batsmen.map((b, idx) => (
+                        <tr key={idx} className="hover:bg-gray-900/40">
+                          <td className="py-2.5 pr-4 font-sans font-bold text-white">
+                            {b.name}
+                            {!b.isOut && <span className="text-emerald-400 text-[10px] ml-1">*</span>}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-gray-400 text-[11px] capitalize">
+                            {b.isOut ? b.dismissal : 'Not out'}
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-black text-white">{b.runs}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-400">{b.balls}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-400">{b.fours}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-400">{b.sixes}</td>
+                          <td className="py-2.5 pl-3 text-right text-teal-400">{b.strikeRate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-800 flex justify-between">
+                  <span>
+                    Extras: {selectedInnings.extras?.total || 0} (w {selectedInnings.extras?.wides || 0}, nb {selectedInnings.extras?.noBalls || 0}, b {selectedInnings.extras?.byes || 0}, lb {selectedInnings.extras?.legByes || 0})
+                  </span>
+                  <span>CRR: {selectedInnings.legalBalls > 0 ? ((selectedInnings.totalRuns / (selectedInnings.legalBalls / 6))).toFixed(2) : '0.00'}</span>
+                </div>
+              </div>
+
+              {/* Bowling Section */}
+              <div className="space-y-3 pt-4 border-t border-gray-800">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-teal-400">
+                  {selectedInnings.bowlingTeam} Bowling
+                </h4>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-gray-800 text-gray-400 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 pr-4">Bowler</th>
+                        <th className="py-2.5 px-2 text-right">O</th>
+                        <th className="py-2.5 px-2 text-right">M</th>
+                        <th className="py-2.5 px-2 text-right">R</th>
+                        <th className="py-2.5 px-2 text-right">W</th>
+                        <th className="py-2.5 pl-3 text-right">ECON</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60 font-mono">
+                      {selectedInnings.bowlers?.map((bowl, idx) => (
+                        <tr key={idx} className="hover:bg-gray-900/40">
+                          <td className="py-2.5 pr-4 font-sans font-bold text-white">{bowl.name}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-300">{bowl.overs}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-400">{bowl.maidens}</td>
+                          <td className="py-2.5 px-2 text-right font-bold text-white">{bowl.runsConceded}</td>
+                          <td className="py-2.5 px-2 text-right font-black text-teal-300">{bowl.wickets}</td>
+                          <td className="py-2.5 pl-3 text-right text-emerald-400">{bowl.economy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Creator Edit Modal */}

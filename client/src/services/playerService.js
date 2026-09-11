@@ -40,6 +40,17 @@ export const playerService = {
     const response = await api.put('/players/me/privacy', { profileVisibility });
     return response.data;
   },
+
+  // Get automatic player career statistics generated from match data
+  // params: { format?: 'all' | 'T20' | 'T10' | 'ODI' }
+  getPlayerStats: async (id, format = 'all') => {
+    const params = {};
+    if (format && format !== 'all' && format !== 'Overall') {
+      params.format = format;
+    }
+    const response = await api.get(`/players/${id}/stats`, { params });
+    return response.data;
+  },
 };
 
 export default playerService;

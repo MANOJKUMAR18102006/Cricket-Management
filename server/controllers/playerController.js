@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import Player from '../models/Player.js';
 import User from '../models/User.js';
 import { canViewPlayerData, getPlayerForUser } from '../services/privacyService.js';
+import { calculatePlayerStats } from '../services/playerStatsService.js';
 
 /**
  * @route   GET /api/players
@@ -449,3 +450,73 @@ export const getProtectedPlayerStats = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @route   GET /api/players/:id/stats
+ * @desc    Get automatic player career statistics generated from match data (with optional ?format= filter)
+ * @access  Public / Authenticated (Enforces privacy rules)
+ */
+export const getPlayerCareerStats = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { format = 'all' } = req.query;
+
+    const targetPlayer = await Player.findById(id);
+    if (!targetPlayer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Player not found',
+      });
+    }
+
+    // Resolve viewer's player ID if authenticated via token
+    let viewerPlayerId = null;
+    if (req.user) {
+      const viewerPlayer = await Player.findOne({ userId: req.user._id });
+      if (viewerPlayer) {
+        viewerPlayerId = viewerPlayer._id;
+      }
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET || 'crickpulse_super_secret_jwt_key_2026'
+        );
+        const user = await User.findById(decoded.id);
+        if (user) {
+          const viewerPlayer = await Player.findOne({ userId: user._id });
+          if (viewerPlayer) {
+            viewerPlayerId = viewerPlayer._id;
+          }
+        }
+      } catch (err) {
+        // Unauthenticated viewer
+      }
+    }
+
+    // Privacy check: Public or connected or owner
+    const isAuthorized = await canViewPlayerData(viewerPlayerId, targetPlayer._id);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        privacyRestricted: true,
+        message: 'This account is private. Connect with this player to view their career statistics.',
+      });
+    }
+
+    // Calculate dynamic career statistics
+    const stats = await calculatePlayerStats(targetPlayer._id, format);
+
+    res.status(200).json({
+      success: true,
+      playerId: targetPlayer._id,
+      displayName: targetPlayer.displayName,
+      format,
+      stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

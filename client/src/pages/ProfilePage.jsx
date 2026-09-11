@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import playerService from '../services/playerService';
 import PlayerCard from '../components/PlayerCard';
+import PlayerCareerStats from '../components/PlayerCareerStats';
 import { 
   Trophy, 
   Sparkles, 
@@ -165,39 +166,10 @@ export default function ProfilePage() {
 
       {/* Career Stats Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            Career Stats Overview
-          </h2>
-          <span className="text-xs font-mono text-gray-500">Auto-Accumulated</span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-5 rounded-2xl bg-[#0e1424] border border-gray-800 text-center">
-            <p className="text-xs text-gray-400 uppercase font-semibold">Matches</p>
-            <p className="text-3xl font-black text-white mt-1">0</p>
-            <span className="text-[10px] text-gray-500 mt-1 block">Innings: 0</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[#0e1424] border border-gray-800 text-center">
-            <p className="text-xs text-emerald-400 uppercase font-semibold">Runs</p>
-            <p className="text-3xl font-black text-emerald-400 mt-1">0</p>
-            <span className="text-[10px] text-gray-500 mt-1 block">Avg: 0.00 • SR: 0.00</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[#0e1424] border border-gray-800 text-center">
-            <p className="text-xs text-teal-400 uppercase font-semibold">Wickets</p>
-            <p className="text-3xl font-black text-teal-400 mt-1">0</p>
-            <span className="text-[10px] text-gray-500 mt-1 block">Econ: 0.00 • BBI: -</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[#0e1424] border border-gray-800 text-center">
-            <p className="text-xs text-amber-400 uppercase font-semibold">Catches / RO</p>
-            <p className="text-3xl font-black text-amber-400 mt-1">0</p>
-            <span className="text-[10px] text-gray-500 mt-1 block">Dismissals</span>
-          </div>
-        </div>
+        {/* Career Stats Section (Automatic from completed match scorecards) */}
+        {hasProfile && player?._id && (
+          <PlayerCareerStats playerId={player._id} />
+        )}
 
         {/* Privacy Settings Card */}
         <div className="rounded-3xl bg-gradient-to-b from-[#0e1526] to-[#0a0f1d] border border-gray-800 p-6 sm:p-8 shadow-xl">

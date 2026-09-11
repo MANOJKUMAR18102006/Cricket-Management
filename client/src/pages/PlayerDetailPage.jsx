@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import playerService from '../services/playerService';
 import connectionService from '../services/connectionService';
 import PlayerCard from '../components/PlayerCard';
+import PlayerCareerStats from '../components/PlayerCareerStats';
 import { useAuth } from '../context/AuthContext';
 import { 
   ArrowLeft, 
@@ -442,6 +443,9 @@ export default function PlayerDetailPage() {
               <p className="text-sm font-bold text-white truncate">{player.city || 'Unspecified'}</p>
             </div>
           </div>
+
+          {/* Automatic Player Career Statistics & Format Tabs */}
+          <PlayerCareerStats playerId={player._id} />
         </div>
       )}
 
