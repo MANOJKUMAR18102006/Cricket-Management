@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import playerService from '../services/playerService';
+import connectionService from '../services/connectionService';
 import PlayerSearchCard from '../components/PlayerSearchCard';
+import LoginPromptModal from '../components/LoginPromptModal';
 import useDebounce from '../hooks/useDebounce';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { 
   Search, 
   Filter, 
@@ -16,7 +20,7 @@ import {
   Target, 
   Zap, 
   Shield, 
-  Sparkles,
+  Sparkles, 
   AlertCircle,
   UserCheck
 } from 'lucide-react';
@@ -25,6 +29,9 @@ const ROLES = ['All', 'Batter', 'Bowler', 'All-Rounder', 'Wicketkeeper'];
 
 export default function PlayersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
 
   // Search and filter state synced with URL query parameters
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
@@ -32,6 +39,7 @@ export default function PlayersPage() {
   const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
   const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'All');
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page'), 10) || 1);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Debounced values
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -44,9 +52,7 @@ export default function PlayersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Connection system modal state
-  const [connectModalPlayer, setConnectModalPlayer] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // Sync state changes with URL query parameters
   useEffect(() => {
@@ -125,13 +131,76 @@ export default function PlayersPage() {
     );
   }, [searchInput, teamInput, cityInput, selectedRole]);
 
+  const handleConnectClick = async (player) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (player.connectionStatus === 'connected') {
+      toast.info(`You are already connected with ${player.displayName}.`);
+      return;
+    }
+
+    if (player.connectionStatus === 'pending_sent') {
+      toast.info(`Connection request to ${player.displayName} is already pending.`);
+      return;
+    }
+
+    if (player.connectionStatus === 'pending_received') {
+      setActionLoadingId(player._id);
+      try {
+        if (player.connectionId) {
+          const res = await connectionService.acceptRequest(player.connectionId);
+          if (res.success) {
+            toast.success(`Connected with ${player.displayName}!`);
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p._id === player._id ? { ...p, connectionStatus: 'connected' } : p
+              )
+            );
+          }
+        } else {
+          navigate('/connections');
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to accept connection request.');
+      } finally {
+        setActionLoadingId(null);
+      }
+      return;
+    }
+
+    if (player.connectionStatus === 'self') {
+      toast.info('This is your own player profile.');
+      return;
+    }
+
+    setActionLoadingId(player._id);
+    try {
+      const res = await connectionService.sendRequest(player._id);
+      if (res.success) {
+        toast.success(`Connection request sent to ${player.displayName}!`);
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p._id === player._id ? { ...p, connectionStatus: 'pending_sent' } : p
+          )
+        );
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send connection request.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen py-8 sm:py-12 relative overflow-hidden">
       {/* Background ambient glow */}
       <div className="absolute top-10 left-1/3 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 blur-[130px] rounded-full pointer-events-none -z-10" />
       <div className="absolute top-72 right-10 w-80 h-80 bg-teal-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         
         {/* Header Title Section */}
         <div className="mb-8">
@@ -356,8 +425,8 @@ export default function PlayersPage() {
 
         {/* Loading Skeleton */}
         {loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {[...Array(10)].map((_, i) => (
               <div
                 key={i}
                 className="h-64 rounded-2xl bg-[#0c1220]/60 border border-gray-850 p-5 animate-pulse flex flex-col justify-between"
@@ -384,14 +453,17 @@ export default function PlayersPage() {
 
         {/* Players Cards Grid */}
         {!loading && players.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {players.map((player) => (
-              <PlayerSearchCard
-                key={player._id}
-                player={player}
-                onConnectClick={(p) => setConnectModalPlayer(p)}
-              />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {players
+              .filter((player) => player.connectionStatus !== 'self' && player.user?.username !== user?.username)
+              .map((player) => (
+                <PlayerSearchCard
+                  key={player._id}
+                  player={player}
+                  onConnectClick={handleConnectClick}
+                  isActionLoading={actionLoadingId === player._id}
+                />
+              ))}
           </div>
         )}
 
@@ -489,44 +561,13 @@ export default function PlayersPage() {
 
       </div>
 
-      {/* Connection System Modal (Future System Preparation) */}
-      {connectModalPlayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-md rounded-3xl bg-[#0f172a] border border-gray-800 p-6 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4">
-              <UserCheck className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-lg font-bold text-white text-center mb-1">
-              Connect with {connectModalPlayer.displayName}
-            </h3>
-            <p className="text-xs text-emerald-400/80 font-mono text-center mb-4">
-              @{connectModalPlayer.username || connectModalPlayer.user?.username}
-            </p>
-
-            <div className="p-4 rounded-2xl bg-[#090d16] border border-gray-800/80 text-xs text-gray-300 space-y-2 mb-6">
-              <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                <Sparkles className="w-4 h-4" />
-                <span>Player Connection System (Coming Soon)</span>
-              </div>
-              <p className="leading-relaxed text-gray-400">
-                You will soon be able to send teammate invitations, challenge {connectModalPlayer.displayName}'s team to friendly fixtures, and exchange direct messages.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setConnectModalPlayer(null)}
-                className="w-full py-2.5 rounded-xl font-semibold text-xs text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-md shadow-emerald-500/20"
-              >
-                Got It, Thanks!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Login Prompt Modal for Guests */}
+      <LoginPromptModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        message="Sign in to connect with players."
+        actionText="Sign In to Connect"
+      />
     </div>
   );
 }

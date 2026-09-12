@@ -22,6 +22,16 @@ const runTests = async () => {
 
     const jwtSecret = process.env.JWT_SECRET || 'crickpulse_super_secret_jwt_key_2026';
 
+    // Clean up previous runs
+    await Player.deleteMany({ displayName: 'Klown Rahul' });
+    await Player.deleteMany({ displayName: 'Secret Spinner' });
+    await Player.deleteMany({ displayName: 'Stranger User' });
+    await Player.deleteMany({ displayName: 'Loyal Friend' });
+    const oldMatches = await Match.find({ team1: { $in: ['Bangalore Blasters', 'Karnataka Kings'] } });
+    const oldMatchIds = oldMatches.map((m) => m._id);
+    await Innings.deleteMany({ match: { $in: oldMatchIds } });
+    await Match.deleteMany({ _id: { $in: oldMatchIds } });
+
     // 1. Create Test Star Player (Public Profile)
     const starUser = await User.create({
       username: `star_batsman_${Date.now()}`,
@@ -206,7 +216,9 @@ const runTests = async () => {
 
     // --- TEST 1: Get Overall Career Stats (GET /api/players/:id/stats) ---
     console.log('--- TEST 1: Get Overall Career Stats (GET /api/players/:id/stats) ---');
-    const res1 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats`);
+    const res1 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats`, {
+      headers: { Authorization: `Bearer ${starToken}` },
+    });
     const data1 = await res1.json();
 
     if (!res1.ok || !data1.success) {
@@ -222,7 +234,9 @@ const runTests = async () => {
 
     // --- TEST 2: Filter by Format (GET /api/players/:id/stats?format=T20) ---
     console.log('--- TEST 2: Filter by Format (GET /api/players/:id/stats?format=T20) ---');
-    const res2 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats?format=T20`);
+    const res2 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats?format=T20`, {
+      headers: { Authorization: `Bearer ${starToken}` },
+    });
     const data2 = await res2.json();
 
     if (!res2.ok || data2.stats.batting.runs !== 76 || data2.stats.batting.matches !== 1) {
@@ -232,7 +246,9 @@ const runTests = async () => {
 
     // --- TEST 3: Filter by Format (GET /api/players/:id/stats?format=T10) ---
     console.log('--- TEST 3: Filter by Format (GET /api/players/:id/stats?format=T10) ---');
-    const res3 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats?format=T10`);
+    const res3 = await fetch(`${BASE_URL}/players/${starPlayer._id}/stats?format=T10`, {
+      headers: { Authorization: `Bearer ${starToken}` },
+    });
     const data3 = await res3.json();
 
     if (!res3.ok || data3.stats.batting.runs !== 54 || data3.stats.batting.highestScore !== '54*') {
