@@ -13,14 +13,6 @@ import { canViewPlayerData, getPlayerForUser } from '../services/privacyService.
  */
 export const checkConnectionMiddleware = async (req, res, next) => {
   try {
-    // 1. Ensure user is authenticated
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required to access cricket data.',
-      });
-    }
-
     const targetId = req.params.id || req.params.playerId;
     if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({
@@ -42,12 +34,28 @@ export const checkConnectionMiddleware = async (req, res, next) => {
       });
     }
 
+    // Public accounts can be viewed by anyone including guests
+    if (targetPlayer.profileVisibility === 'public') {
+      req.targetPlayer = targetPlayer;
+      return next();
+    }
+
+    // If account is private, guest is rejected
+    if (!req.user) {
+      return res.status(403).json({
+        success: false,
+        message: "🔒 This player's detailed cricket statistics are only visible to accepted connections.",
+        privacyRestricted: true,
+      });
+    }
+
     // Resolve viewer's player document
     const viewerPlayer = await getPlayerForUser(req.user);
     if (!viewerPlayer) {
-      return res.status(400).json({
+      return res.status(403).json({
         success: false,
-        message: 'Viewer player profile not initialized.',
+        message: "🔒 This player's detailed cricket statistics are only visible to accepted connections.",
+        privacyRestricted: true,
       });
     }
 
@@ -57,7 +65,7 @@ export const checkConnectionMiddleware = async (req, res, next) => {
     if (!isAuthorized) {
       return res.status(403).json({
         success: false,
-        message: '🔒 This account is private. Connect with this player to view their cricket statistics.',
+        message: "🔒 This player's cricket statistics are private. Connect with this player to view their statistics.",
         privacyRestricted: true,
       });
     }

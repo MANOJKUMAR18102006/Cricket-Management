@@ -3,8 +3,8 @@ import { Shield, Globe, Share2, MessageCircle, Heart } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-[#070a12] border-t border-gray-800 text-gray-400 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer className="bg-[#070a12] border-t border-gray-800 text-gray-400 py-12 w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           
           {/* Brand Col */}

@@ -10,6 +10,12 @@ export const teamService = {
     return response.data;
   },
 
+  // Get teams where authenticated user is a member/captain (Protected)
+  getMyTeams: async (params = {}) => {
+    const response = await api.get('/teams/my', { params });
+    return response.data;
+  },
+
   // Get single team profile with members and match statistics
   getTeamById: async (id) => {
     const response = await api.get(`/teams/${id}`);

@@ -1,7 +1,10 @@
 import api from './api';
 
+// Registry of listeners for future Socket.IO client updates
+const socketListeners = new Set();
+
 /**
- * Notification Service
+ * Client Notification Service
  */
 export const notificationService = {
   // Get notifications for current authenticated player
@@ -24,8 +27,27 @@ export const notificationService = {
 
   // Mark all notifications as read
   markAllAsRead: async () => {
-    const response = await api.put('/notifications/mark-all-read');
+    const response = await api.put('/notifications/read-all');
     return response.data;
+  },
+
+  // Socket.IO compatibility hook: register a listener for real-time notification pushes
+  subscribeToNotifications: (callback) => {
+    socketListeners.add(callback);
+    return () => {
+      socketListeners.delete(callback);
+    };
+  },
+
+  // Internal trigger to dispatch incoming notifications to subscribers (e.g. from Socket.IO)
+  emitNotification: (notification) => {
+    socketListeners.forEach((listener) => {
+      try {
+        listener(notification);
+      } catch (err) {
+        console.warn('Notification listener error:', err);
+      }
+    });
   },
 };
 

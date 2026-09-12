@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
 import Connection from '../models/Connection.js';
 import { getPlayerForUser } from '../services/privacyService.js';
@@ -20,7 +21,7 @@ export const getNotifications = async (req, res, next) => {
         select: 'displayName profileImage playingRole currentTeam city',
       })
       .sort({ createdAt: -1 })
-      .limit(30);
+      .limit(50);
 
     res.status(200).json({
       success: true,
@@ -45,7 +46,7 @@ export const getUnreadCount = async (req, res, next) => {
     }
 
     const [unreadNotifications, pendingRequests] = await Promise.all([
-      Notification.countDocuments({ recipient: viewerPlayer._id, isRead: false }),
+      Notification.countDocuments({ recipient: viewerPlayer._id, read: false }),
       Connection.countDocuments({ receiver: viewerPlayer._id, status: 'pending' }),
     ]);
 
@@ -53,6 +54,7 @@ export const getUnreadCount = async (req, res, next) => {
       success: true,
       unreadCount: unreadNotifications,
       pendingRequestsCount: pendingRequests,
+      totalUnread: unreadNotifications + pendingRequests,
     });
   } catch (error) {
     next(error);
@@ -66,9 +68,18 @@ export const getUnreadCount = async (req, res, next) => {
  */
 export const markAsRead = async (req, res, next) => {
   try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid notification ID format.',
+      });
+    }
+
     const viewerPlayer = await getPlayerForUser(req.user);
     const notification = await Notification.findOne({
-      _id: req.params.id,
+      _id: id,
       recipient: viewerPlayer._id,
     });
 
@@ -79,7 +90,7 @@ export const markAsRead = async (req, res, next) => {
       });
     }
 
-    notification.isRead = true;
+    notification.read = true;
     await notification.save();
 
     res.status(200).json({
@@ -93,21 +104,31 @@ export const markAsRead = async (req, res, next) => {
 };
 
 /**
- * @route   PUT /api/notifications/mark-all-read
+ * @route   PUT /api/notifications/read-all
+ * @route   PUT /api/notifications/mark-all-read (alias)
  * @desc    Mark all notifications for player as read
  * @access  Private
  */
 export const markAllAsRead = async (req, res, next) => {
   try {
     const viewerPlayer = await getPlayerForUser(req.user);
-    await Notification.updateMany(
-      { recipient: viewerPlayer._id, isRead: false },
-      { $set: { isRead: true } }
+    if (!viewerPlayer) {
+      return res.status(200).json({
+        success: true,
+        message: 'All notifications marked as read.',
+        modifiedCount: 0,
+      });
+    }
+
+    const result = await Notification.updateMany(
+      { recipient: viewerPlayer._id, read: false },
+      { $set: { read: true } }
     );
 
     res.status(200).json({
       success: true,
       message: 'All notifications marked as read.',
+      modifiedCount: result.modifiedCount,
     });
   } catch (error) {
     next(error);

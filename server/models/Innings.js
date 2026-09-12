@@ -14,8 +14,11 @@ const deliverySchema = new mongoose.Schema(
     totalDeliveryRuns: { type: Number, default: 0 },
     isLegal: { type: Boolean, default: true }, // false for wide and no_ball
     striker: { type: String, required: true, trim: true },
+    strikerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
     nonStriker: { type: String, required: true, trim: true },
+    nonStrikerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
     bowler: { type: String, required: true, trim: true },
+    bowlerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
     isWicket: { type: Boolean, default: false },
     wicketType: {
       type: String,
@@ -23,7 +26,11 @@ const deliverySchema = new mongoose.Schema(
       default: '',
     },
     dismissedPlayer: { type: String, default: '', trim: true },
+    dismissedPlayerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
+    fielder: { type: String, default: '', trim: true },
+    fielderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
     newBatsman: { type: String, default: '', trim: true },
+    newBatsmanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null },
     commentary: { type: String, default: '', trim: true },
     timestamp: { type: Date, default: Date.now },
   },
@@ -111,12 +118,52 @@ const inningsSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    strikerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      default: null,
+    },
     nonStriker: {
       type: String,
       default: '',
       trim: true,
     },
+    nonStrikerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      default: null,
+    },
+    openingStriker: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    openingStrikerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      default: null,
+    },
+    openingNonStriker: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    openingNonStrikerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      default: null,
+    },
     currentBowler: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    currentBowlerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      default: null,
+    },
+    previousBowler: {
       type: String,
       default: '',
       trim: true,

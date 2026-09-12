@@ -21,6 +21,18 @@ export const authService = {
     const response = await api.get('/auth/me');
     return response.data;
   },
+
+  // Update account information (username, email)
+  updateAccount: async (accountData) => {
+    const response = await api.put('/auth/me', accountData);
+    return response.data;
+  },
+
+  // Change account password
+  changePassword: async (passwordData) => {
+    const response = await api.put('/auth/change-password', passwordData);
+    return response.data;
+  },
 };
 
 export default authService;

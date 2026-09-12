@@ -8,9 +8,13 @@ import {
   searchPlayers,
   getProtectedPlayerStats,
   getPlayerCareerStats,
+  getPlayerMatches,
+  comparePlayers,
 } from '../controllers/playerController.js';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { getPlayerAnalyticsData } from '../controllers/analyticsController.js';
+import { authMiddleware, optionalAuth } from '../middlewares/authMiddleware.js';
 import { checkConnectionMiddleware } from '../middlewares/checkConnectionMiddleware.js';
+import { requirePlayerConnection } from '../middlewares/requirePlayerConnection.js';
 
 const router = Router();
 
@@ -20,16 +24,25 @@ router.get('/me', authMiddleware, getMyPlayerProfile);
 router.put('/me', authMiddleware, updateMyPlayerProfile);
 router.put('/me/privacy', authMiddleware, updatePrivacySetting);
 
-// Public player discovery search (Accessible to all users)
-router.get('/', searchPlayers);
+// Public player discovery search (Supports optional authentication to detect connection status)
+router.get('/', optionalAuth, searchPlayers);
 
-// Public player profile (Accessible to all users, with backend privacy filtering)
-router.get('/:id', getPlayerById);
+// Player Comparison (Public for public players; enforces connection for private players)
+router.get('/compare', optionalAuth, comparePlayers);
 
-// Automatic Player Career Statistics (Generated dynamically from match performance, with privacy guard)
-router.get('/:id/stats', getPlayerCareerStats);
+// Public player profile (Supports optional authentication to detect connection status)
+router.get('/:id', optionalAuth, getPlayerById);
 
-// Protected player cricket statistics (Guarded strictly by checkConnectionMiddleware)
-router.get('/:id/protected-stats', authMiddleware, checkConnectionMiddleware, getProtectedPlayerStats);
+// Automatic Player Career Statistics (Guarded by requirePlayerConnection with public support)
+router.get('/:id/stats', optionalAuth, requirePlayerConnection, getPlayerCareerStats);
+
+// Player Match History & Match Performances (Guarded by requirePlayerConnection with public support)
+router.get('/:id/matches', optionalAuth, requirePlayerConnection, getPlayerMatches);
+
+// Protected player cricket statistics (Guarded by checkConnectionMiddleware)
+router.get('/:id/protected-stats', optionalAuth, checkConnectionMiddleware, getProtectedPlayerStats);
+
+// Player Performance Analytics & Trends (Privacy-guarded)
+router.get('/:id/analytics', getPlayerAnalyticsData);
 
 export default router;

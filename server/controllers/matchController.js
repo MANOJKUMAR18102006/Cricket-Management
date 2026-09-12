@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import Match from '../models/Match.js';
+import Player from '../models/Player.js';
+import { notifyMatchInvitation, notifyMatchCompleted } from '../services/notificationService.js';
 
 /**
  * @route   POST /api/matches
@@ -103,6 +105,18 @@ export const createMatch = async (req, res, next) => {
       result: result ? result.trim() : '',
       createdBy: req.user._id,
     });
+
+    // Dispatch match invitation notification to team2 members & captain
+    try {
+      const creatorPlayer = await Player.findOne({ userId: req.user._id });
+      await notifyMatchInvitation({
+        match,
+        invitedTeamName: team2,
+        creatorPlayer,
+      });
+    } catch (notifErr) {
+      console.warn('Failed to dispatch match_invitation notification:', notifErr.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -298,6 +312,19 @@ export const updateMatch = async (req, res, next) => {
     }
 
     await match.save();
+
+    // Dispatch match completed notification if status is completed
+    if (match.status === 'completed') {
+      try {
+        const creatorPlayer = await Player.findOne({ userId: req.user._id });
+        await notifyMatchCompleted({
+          match,
+          creatorPlayer,
+        });
+      } catch (notifErr) {
+        console.warn('Failed to dispatch match_completed notification:', notifErr.message);
+      }
+    }
 
     res.status(200).json({
       success: true,

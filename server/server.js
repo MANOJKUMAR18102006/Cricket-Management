@@ -10,6 +10,11 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import scoringRoutes from './routes/scoringRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import teamInvitationRoutes from './routes/teamInvitationRoutes.js';
+import tournamentRoutes from './routes/tournamentRoutes.js';
+import tournamentInvitationRoutes from './routes/tournamentInvitationRoutes.js';
 import { notFoundHandler, errorHandler } from './middlewares/errorMiddleware.js';
 
 // Load environment variables
@@ -65,7 +70,12 @@ app.use('/api/connections', connectionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/team-invitations', teamInvitationRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/tournament-invitations', tournamentInvitationRoutes);
 app.use('/api/scoring', scoringRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error Handling Middleware
 app.use(notFoundHandler);

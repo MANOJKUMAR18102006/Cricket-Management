@@ -9,11 +9,14 @@ import {
   MapPin, 
   Users, 
   UserPlus, 
+  UserCheck,
+  User,
+  Clock,
   ChevronRight,
   Hash
 } from 'lucide-react';
 
-export default function PlayerSearchCard({ player, onConnectClick }) {
+export default function PlayerSearchCard({ player, onConnectClick, isActionLoading = false }) {
   const navigate = useNavigate();
 
   if (!player) return null;
@@ -151,15 +154,55 @@ export default function PlayerSearchCard({ player, onConnectClick }) {
 
       {/* Footer Actions */}
       <div className="pt-3.5 mt-2 border-t border-gray-850 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={handleConnect}
-          title="Connection system coming soon"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition active:scale-95"
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          <span>Connect</span>
-        </button>
+        {player.connectionStatus === 'connected' ? (
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-sky-400 bg-sky-500/15 border border-sky-500/40 shadow-sm shadow-sky-500/15"
+            title="You are connected with this player"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-sky-400" />
+            <span>Connected</span>
+          </span>
+        ) : player.connectionStatus === 'self' ? (
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400 bg-gray-850 border border-gray-700/60"
+            title="Your player profile"
+          >
+            <User className="w-3.5 h-3.5 text-emerald-400" />
+            <span>You</span>
+          </span>
+        ) : player.connectionStatus === 'pending_sent' ? (
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30"
+            title="Connection request pending"
+          >
+            <Clock className="w-3.5 h-3.5 animate-pulse" />
+            <span>Pending</span>
+          </span>
+        ) : player.connectionStatus === 'pending_received' ? (
+          <button
+            type="button"
+            onClick={handleConnect}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-black bg-emerald-500 hover:bg-emerald-400 transition active:scale-95 shadow-md shadow-emerald-500/20"
+            title="Accept incoming connection request"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Accept</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnect}
+            disabled={isActionLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition active:scale-95 disabled:opacity-50"
+          >
+            {isActionLoading ? (
+              <div className="w-3.5 h-3.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+            ) : (
+              <UserPlus className="w-3.5 h-3.5" />
+            )}
+            <span>Connect</span>
+          </button>
+        )}
 
         <span className="text-xs font-medium text-gray-400 group-hover:text-emerald-400 flex items-center gap-0.5 transition-colors">
           <span>View Profile</span>

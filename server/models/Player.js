@@ -79,6 +79,13 @@ const playerSchema = new mongoose.Schema(
   }
 );
 
+// Indexes to accelerate discovery, role/team filtering, and recent sorting
+playerSchema.index({ playingRole: 1, profileVisibility: 1 });
+playerSchema.index({ currentTeam: 1 });
+playerSchema.index({ city: 1 });
+playerSchema.index({ displayName: 1 });
+playerSchema.index({ createdAt: -1 });
+
 const Player = mongoose.model('Player', playerSchema);
 
 export default Player;

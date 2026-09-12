@@ -51,6 +51,32 @@ export const playerService = {
     const response = await api.get(`/players/${id}/stats`, { params });
     return response.data;
   },
+
+  // Get player match history (Strictly guarded by requirePlayerConnection)
+  // params: { format, tournament, result, startDate, endDate }
+  getPlayerMatches: async (id, params = {}) => {
+    const cleanParams = {};
+    Object.keys(params).forEach((k) => {
+      if (params[k] !== undefined && params[k] !== null && params[k] !== '' && params[k] !== 'all') {
+        cleanParams[k] = params[k];
+      }
+    });
+    const response = await api.get(`/players/${id}/matches`, { params: cleanParams });
+    return response.data;
+  },
+
+  // Compare two connected players across formats
+  // params: { playerA, playerB, format }
+  comparePlayers: async (params = {}) => {
+    const cleanParams = {};
+    Object.keys(params).forEach((k) => {
+      if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+        cleanParams[k] = params[k];
+      }
+    });
+    const response = await api.get('/players/compare', { params: cleanParams });
+    return response.data;
+  },
 };
 
 export default playerService;

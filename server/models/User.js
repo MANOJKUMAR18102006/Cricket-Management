@@ -47,6 +47,14 @@ const userSchema = new mongoose.Schema(
       },
       default: 'player',
     },
+    status: {
+      type: String,
+      enum: {
+        values: ['active', 'disabled'],
+        message: '{VALUE} is not a supported status',
+      },
+      default: 'active',
+    },
     createdAt: {
       type: Date,
       default: Date.now,
@@ -63,6 +71,9 @@ const userSchema = new mongoose.Schema(
     },
   }
 );
+
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
 
 // Pre-save hook: Hash password before saving if modified
 userSchema.pre('save', async function (next) {

@@ -94,7 +94,8 @@ export const sendConnectionRequest = async (req, res, next) => {
         sender: viewerPlayer._id,
         type: 'connection_request',
         message: `${viewerPlayer.displayName} sent you a connection request.`,
-        connectionId: existingConnection._id,
+        relatedId: existingConnection._id,
+        read: false,
       });
 
       return res.status(201).json({
@@ -117,7 +118,8 @@ export const sendConnectionRequest = async (req, res, next) => {
       sender: viewerPlayer._id,
       type: 'connection_request',
       message: `${viewerPlayer.displayName} sent you a connection request.`,
-      connectionId: connection._id,
+      relatedId: connection._id,
+      read: false,
     });
 
     res.status(201).json({
@@ -284,7 +286,8 @@ export const acceptConnectionRequest = async (req, res, next) => {
       sender: viewerPlayer._id,
       type: 'connection_accepted',
       message: `${viewerPlayer.displayName} accepted your connection request. You can now view each other's statistics.`,
-      connectionId: connection._id,
+      relatedId: connection._id,
+      read: false,
     });
 
     res.status(200).json({
@@ -340,7 +343,8 @@ export const rejectConnectionRequest = async (req, res, next) => {
       sender: viewerPlayer._id,
       type: 'connection_rejected',
       message: `${viewerPlayer.displayName} declined your connection request.`,
-      connectionId: connection._id,
+      relatedId: connection._id,
+      read: false,
     });
 
     res.status(200).json({

@@ -38,6 +38,13 @@ export const authMiddleware = async (req, res, next) => {
       });
     }
 
+    if (user.status === 'disabled') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account disabled: Your account has been suspended by an administrator.',
+      });
+    }
+
     // Attach user to request object
     req.user = user;
     next();
@@ -53,5 +60,37 @@ export const authMiddleware = async (req, res, next) => {
       success: false,
       message: 'Authentication failed: Invalid token.',
     });
+  }
+};
+
+/**
+ * Optional Authentication Middleware
+ * Attaches req.user if a valid token is provided; otherwise proceeds as anonymous
+ */
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return next();
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'crickpulse_super_secret_jwt_key_2026'
+    );
+
+    const user = await User.findById(decoded.id);
+    if (user && user.status !== 'disabled') {
+      req.user = user;
+    }
+    next();
+  } catch (error) {
+    // If token is invalid or expired, gracefully continue without req.user
+    next();
   }
 };

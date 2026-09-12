@@ -54,6 +54,12 @@ const matchSchema = new mongoose.Schema(
       trim: true,
       maxlength: [80, 'Tournament name cannot exceed 80 characters'],
     },
+    tournamentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tournament',
+      default: null,
+      index: true,
+    },
     tossWinner: {
       type: String,
       default: '',
@@ -95,6 +101,18 @@ const matchSchema = new mongoose.Schema(
       overs: { type: String, default: '0.0' },
       target: { type: Number, default: null },
     },
+    team1PlayingXI: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Player',
+      },
+    ],
+    team2PlayingXI: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Player',
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -106,10 +124,14 @@ const matchSchema = new mongoose.Schema(
   }
 );
 
-// Indexes to optimize status-based fixture queries and chronologic sorting
+// Indexes to optimize status-based fixture queries, tournament lookups, and chronologic sorting
 matchSchema.index({ status: 1, date: 1 });
 matchSchema.index({ date: -1 });
 matchSchema.index({ createdBy: 1 });
+matchSchema.index({ tournament: 1 });
+matchSchema.index({ format: 1 });
+matchSchema.index({ status: 1, tournament: 1 });
+matchSchema.index({ team1: 1, team2: 1 });
 
 const Match = mongoose.model('Match', matchSchema);
 

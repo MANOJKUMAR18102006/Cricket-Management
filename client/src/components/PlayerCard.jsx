@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Shield, 
   MapPin, 
@@ -9,7 +10,10 @@ import {
   Zap, 
   Target, 
   Calendar,
-  Hash
+  Hash,
+  User,
+  Edit3,
+  Settings
 } from 'lucide-react';
 
 export default function PlayerCard({ player, isOwner = false, onEdit }) {
@@ -141,16 +145,33 @@ export default function PlayerCard({ player, isOwner = false, onEdit }) {
             </div>
           </div>
 
-          {/* Action button if owner */}
-          {isOwner && onEdit && (
-            <div className="flex items-center justify-center sm:justify-end sm:mb-2">
-              <button
-                onClick={onEdit}
-                className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+          {/* Action buttons if owner */}
+          {isOwner && (
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:mb-2">
+              <Link
+                to="/settings/account"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-gray-900 border border-gray-800 hover:border-gray-700 transition flex items-center gap-1.5 shadow-sm"
+                title="Edit login, username and account settings"
               >
-                <Sparkles className="w-4 h-4" />
-                Edit Profile
-              </button>
+                <User className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Edit Account</span>
+              </Link>
+              <Link
+                to="/players/me/edit"
+                className="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                title="Edit cricket attributes, playing role and skills"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Edit Player Profile</span>
+              </Link>
+              <Link
+                to="/settings/privacy"
+                className="p-2 sm:p-2.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-amber-400 bg-gray-900 border border-gray-800 hover:border-gray-700 transition flex items-center justify-center shadow-sm group"
+                title="Privacy Settings"
+                aria-label="Privacy Settings"
+              >
+                <Settings className="w-4 h-4 text-amber-400 group-hover:rotate-45 transition-transform duration-300" />
+              </Link>
             </div>
           )}
 
