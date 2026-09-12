@@ -48,7 +48,7 @@ export default function LandingPage() {
       <div className="absolute top-80 right-10 w-80 h-80 bg-teal-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
 
       {/* Hero Section */}
-      <section className="pt-12 pb-20 md:pt-20 md:pb-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="pt-12 pb-20 md:pt-20 md:pb-28 w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="text-center max-w-3xl mx-auto space-y-6">
           
           {/* Badge */}
@@ -221,7 +221,7 @@ export default function LandingPage() {
 
       {/* Feature Highlights Section */}
       <section className="py-16 bg-[#070a13] border-t border-gray-850">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
           <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
             <h2 className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Comprehensive Platform</h2>
             <p className="text-3xl font-extrabold text-white sm:text-4xl">
@@ -282,7 +282,7 @@ export default function LandingPage() {
 
       {/* Tech Stack Banner */}
       <section className="py-12 border-t border-gray-850 bg-[#090d16]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 text-center">
           <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-6">
             Engineered on the Modern MERN Architecture
           </p>

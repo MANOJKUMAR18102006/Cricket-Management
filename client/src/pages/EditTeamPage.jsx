@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import teamService from '../services/teamService';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import { useToast } from '../context/ToastContext';
 import {
   Shield,
   MapPin,
@@ -43,6 +47,7 @@ export default function EditTeamPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -59,6 +64,7 @@ export default function EditTeamPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const [creatorId, setCreatorId] = useState(null);
 
@@ -94,7 +100,14 @@ export default function EditTeamPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      // If a player is selected as captain, that player cannot be appointed as vice captain
+      if (name === 'captain' && next.viceCaptain && String(next.viceCaptain) === String(value)) {
+        next.viceCaptain = '';
+      }
+      return next;
+    });
   };
 
   const handleFileUpload = (e) => {
@@ -133,6 +146,11 @@ export default function EditTeamPage() {
       return;
     }
 
+    if (formData.captain && formData.viceCaptain && String(formData.captain) === String(formData.viceCaptain)) {
+      setError('The player selected as Captain cannot also be appointed as Vice Captain');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -157,29 +175,22 @@ export default function EditTeamPage() {
   };
 
   const handleDeleteTeam = async () => {
-    if (!window.confirm('Are you sure you want to delete this team? This action cannot be undone.')) {
-      return;
-    }
-
     setDeleting(true);
     try {
       const res = await teamService.deleteTeam(id);
       if (res.success) {
+        toast.success('Team deleted successfully.');
         navigate('/teams');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete team');
+      toast.error(err.response?.data?.message || 'Failed to delete team');
       setDeleting(false);
+      setShowConfirmDelete(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#070b13] flex flex-col items-center justify-center py-24">
-        <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 text-sm">Loading team editor...</p>
-      </div>
-    );
+    return <LoadingSpinner fullPage label="Loading team editor..." />;
   }
 
   const isCreatorOrAdmin = user && (user._id === creatorId || user.role === 'admin');
@@ -495,12 +506,12 @@ export default function EditTeamPage() {
               </p>
               <button
                 type="button"
-                onClick={handleDeleteTeam}
+                onClick={() => setShowConfirmDelete(true)}
                 disabled={deleting}
                 className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-semibold transition disabled:opacity-50 flex items-center gap-2"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{deleting ? 'Deleting Team...' : 'Delete Team'}</span>
+                <span>Delete Team</span>
               </button>
             </div>
           )}
@@ -508,6 +519,17 @@ export default function EditTeamPage() {
         </div>
 
       </div>
+
+      <ConfirmDialog
+        isOpen={showConfirmDelete}
+        title="Delete Team"
+        message="Are you sure you want to delete this team? This permanently removes the club and disbands its squad. This action cannot be undone."
+        confirmText="Delete Team"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDeleteTeam}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
     </div>
   );
 }

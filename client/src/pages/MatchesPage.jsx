@@ -118,7 +118,7 @@ export default function MatchesPage() {
   };
 
   return (
-    <div className="min-h-screen py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
       
       {/* Top Header */}
       <div className="mb-8">
@@ -283,8 +283,8 @@ export default function MatchesPage() {
 
       {/* Loading Skeleton */}
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
             <div key={i} className="rounded-3xl bg-[#0c1220] border border-gray-800/80 p-6 animate-pulse space-y-4">
               <div className="flex justify-between">
                 <div className="h-5 w-24 bg-gray-800 rounded-lg" />
@@ -300,7 +300,7 @@ export default function MatchesPage() {
 
       {/* Matches Grid */}
       {!loading && matches.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
           {matches.map((match) => {
             const matchDate = new Date(match.date).toLocaleDateString('en-US', {
               weekday: 'short',

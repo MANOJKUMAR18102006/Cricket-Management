@@ -1,6 +1,133 @@
+import mongoose from 'mongoose';
 import Team from '../models/Team.js';
 import Player from '../models/Player.js';
 import Match from '../models/Match.js';
+import { notifyTeamAdded, notifyTeamRemoved } from '../services/notificationService.js';
+import { getPlayerForUser } from '../services/privacyService.js';
+
+/**
+ * @desc    Get all teams where the authenticated user is a member/captain
+ * @route   GET /api/teams/my
+ * @access  Private (Authenticated users)
+ */
+export const getMyTeams = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized, no user found',
+      });
+    }
+
+    // Resolve player record for authenticated user
+    const player = await getPlayerForUser(req.user);
+    if (!player) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        teams: [],
+        captainTeams: [],
+        memberTeams: [],
+      });
+    }
+
+    const playerId = player._id;
+    const { search, city } = req.query;
+
+    // A team belongs in My Teams when current player is captain or accepted member
+    const baseMembershipFilter = [
+      { captain: playerId },
+      { members: playerId },
+    ];
+
+    const query = {
+      $or: baseMembershipFilter,
+    };
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$and = [
+        { $or: baseMembershipFilter },
+        {
+          $or: [
+            { name: searchRegex },
+            { city: searchRegex },
+            { description: searchRegex },
+          ],
+        },
+      ];
+      delete query.$or;
+    }
+
+    if (city && city.trim() !== 'all') {
+      query.city = new RegExp(`^${city.trim()}$`, 'i');
+    }
+
+    const teams = await Team.find(query)
+      .populate('captain', 'displayName profileImage playingRole')
+      .populate('viceCaptain', 'displayName profileImage playingRole')
+      .populate('createdBy', 'username role')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Enrich each team with match records and player's specific role
+    const enrichedTeams = await Promise.all(
+      teams.map(async (team) => {
+        const matchesCount = await Match.countDocuments({
+          $or: [{ team1: team.name }, { team2: team.name }],
+        });
+
+        const wins = await Match.countDocuments({
+          winner: team.name,
+          status: 'completed',
+        });
+
+        const losses = await Match.countDocuments({
+          status: 'completed',
+          winner: { $ne: '', $ne: team.name },
+          $or: [{ team1: team.name }, { team2: team.name }],
+        });
+
+        // Determine player's role in this team
+        const isCaptain = team.captain && String(team.captain._id || team.captain) === String(playerId);
+        const isViceCaptain = team.viceCaptain && String(team.viceCaptain._id || team.viceCaptain) === String(playerId);
+
+        let playerRole = 'Member';
+        if (isCaptain) {
+          playerRole = 'Captain';
+        } else if (isViceCaptain) {
+          playerRole = 'Vice Captain';
+        }
+
+        return {
+          ...team,
+          membersCount: team.members ? team.members.length : 0,
+          isCaptain,
+          isViceCaptain,
+          playerRole,
+          stats: {
+            matchesCount,
+            wins,
+            losses,
+          },
+        };
+      })
+    );
+
+    const captainTeams = enrichedTeams.filter((t) => t.isCaptain);
+    const memberTeams = enrichedTeams.filter((t) => !t.isCaptain);
+
+    res.status(200).json({
+      success: true,
+      count: enrichedTeams.length,
+      teams: enrichedTeams,
+      captainTeams,
+      memberTeams,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * @desc    Create a new team
@@ -37,8 +164,8 @@ export const createTeam = async (req, res, next) => {
       });
     }
 
-    // Identify creator's player profile if available
-    const creatorPlayer = await Player.findOne({ userId: req.user._id });
+    // Identify creator's player profile (safely auto-creates if not yet initialized)
+    const creatorPlayer = await getPlayerForUser(req.user);
 
     const initialMembers = [];
     if (creatorPlayer) {
@@ -49,6 +176,17 @@ export const createTeam = async (req, res, next) => {
     let designatedCaptain = captain || null;
     if (!designatedCaptain && creatorPlayer) {
       designatedCaptain = creatorPlayer._id;
+    }
+
+    if (
+      designatedCaptain &&
+      viceCaptain &&
+      designatedCaptain.toString() === viceCaptain.toString()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'The player selected as Captain cannot also be appointed as Vice Captain',
+      });
     }
 
     const team = await Team.create({
@@ -88,9 +226,9 @@ export const getTeams = async (req, res, next) => {
 
     const query = {};
 
-    if (search) {
+    if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), 'i');
-      query.$or = [{ name: searchRegex }, { city: searchRegex }];
+      query.$or = [{ name: searchRegex }, { city: searchRegex }, { description: searchRegex }];
     }
 
     if (city && city.trim() !== 'all') {
@@ -164,6 +302,13 @@ export const getTeams = async (req, res, next) => {
 export const getTeamById = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID format.',
+      });
+    }
 
     const team = await Team.findById(id)
       .populate({
@@ -240,6 +385,14 @@ export const getTeamById = async (req, res, next) => {
 export const updateTeam = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID format.',
+      });
+    }
+
     const { name, city, description, logo, captain, viceCaptain } = req.body;
 
     const team = await Team.findById(id);
@@ -333,6 +486,18 @@ export const updateTeam = async (req, res, next) => {
       }
     }
 
+    // Prevent captain from being appointed as vice captain
+    if (
+      team.captain &&
+      team.viceCaptain &&
+      team.captain.toString() === team.viceCaptain.toString()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'The player selected as Captain cannot also be appointed as Vice Captain',
+      });
+    }
+
     await team.save();
 
     const updatedTeam = await Team.findById(team._id)
@@ -359,6 +524,13 @@ export const updateTeam = async (req, res, next) => {
 export const deleteTeam = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID format.',
+      });
+    }
 
     const team = await Team.findById(id);
 
@@ -398,6 +570,13 @@ export const deleteTeam = async (req, res, next) => {
 export const addMember = async (req, res, next) => {
   try {
     const { id, playerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(playerId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID or player ID format.',
+      });
+    }
 
     const team = await Team.findById(id);
 
@@ -454,6 +633,18 @@ export const addMember = async (req, res, next) => {
 
     await team.save();
 
+    // Dispatch team added notification
+    try {
+      const senderPlayer = await Player.findOne({ userId: req.user._id });
+      await notifyTeamAdded({
+        player,
+        team,
+        senderPlayer,
+      });
+    } catch (notifErr) {
+      console.warn('Failed to dispatch team_added notification:', notifErr.message);
+    }
+
     const populatedTeam = await Team.findById(team._id)
       .populate('captain', 'displayName profileImage playingRole')
       .populate('viceCaptain', 'displayName profileImage playingRole')
@@ -477,6 +668,13 @@ export const addMember = async (req, res, next) => {
 export const removeMember = async (req, res, next) => {
   try {
     const { id, playerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(playerId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID or player ID format.',
+      });
+    }
 
     const team = await Team.findById(id);
 
@@ -520,6 +718,20 @@ export const removeMember = async (req, res, next) => {
     }
 
     await team.save();
+
+    // Dispatch team removed notification (if not removed by himself)
+    try {
+      if (!isSelf) {
+        const senderPlayer = await Player.findOne({ userId: req.user._id });
+        await notifyTeamRemoved({
+          player: playerId,
+          team,
+          senderPlayer,
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Failed to dispatch team_removed notification:', notifErr.message);
+    }
 
     const populatedTeam = await Team.findById(team._id)
       .populate('captain', 'displayName profileImage playingRole')

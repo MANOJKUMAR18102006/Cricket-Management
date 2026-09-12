@@ -2,15 +2,27 @@ import { Router } from 'express';
 import {
   createTeam,
   getTeams,
+  getMyTeams,
   getTeamById,
   updateTeam,
   deleteTeam,
   addMember,
   removeMember,
 } from '../controllers/teamController.js';
+import {
+  sendTeamInvitation,
+  getTeamInvitations,
+} from '../controllers/teamInvitationController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// Specific routes
+router.get('/my', authMiddleware, getMyTeams);
+
+// Team Recruitment & Invitation routes
+router.post('/:teamId/invitations', authMiddleware, sendTeamInvitation);
+router.get('/:teamId/invitations', authMiddleware, getTeamInvitations);
 
 // Public routes: List teams and view team profile
 router.get('/', getTeams);

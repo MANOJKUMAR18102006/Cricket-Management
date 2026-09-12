@@ -3,6 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import matchService from '../services/matchService';
 import scoringService from '../services/scoringService';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import { useToast } from '../context/ToastContext';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -25,6 +29,7 @@ export default function MatchDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [match, setMatch] = useState(null);
   const [inningsList, setInningsList] = useState([]);
@@ -32,6 +37,8 @@ export default function MatchDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   // Update modal state for creator/admin
   const [showEditModal, setShowEditModal] = useState(false);
@@ -115,40 +122,31 @@ export default function MatchDetailPage() {
   };
 
   const handleDeleteMatch = async () => {
-    if (!window.confirm(`Are you sure you want to delete the match between ${match.team1} and ${match.team2}?`)) {
-      return;
-    }
+    setIsDeleting(true);
     try {
       await matchService.deleteMatch(match._id);
+      toast.success('Match fixture deleted successfully.');
       navigate('/matches');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete match.');
+      toast.error(err.response?.data?.message || 'Failed to delete match.');
+      setIsDeleting(false);
+      setShowConfirmDelete(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin mb-3" />
-        <p className="text-gray-400 text-sm">Loading match details...</p>
-      </div>
-    );
+    return <LoadingSpinner fullPage label="Loading match fixture & scorecards..." />;
   }
 
   if (error || !match) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <div className="w-16 h-16 rounded-3xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2">Match Not Found</h2>
-        <p className="text-sm text-gray-400 mb-6">{error || 'The requested match could not be found.'}</p>
-        <button
-          onClick={() => navigate('/matches')}
-          className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-emerald-500 hover:bg-emerald-600 transition"
-        >
-          Return to Matches
-        </button>
+      <div className="max-w-2xl mx-auto px-4 py-20">
+        <EmptyState
+          title="Match Fixture Not Found"
+          description={error || 'The requested cricket match could not be found or has been removed.'}
+          actionLabel="Return to Matches"
+          actionHref="/matches"
+        />
       </div>
     );
   }
@@ -163,7 +161,7 @@ export default function MatchDetailPage() {
   });
 
   return (
-    <div className="min-h-screen py-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
       
       {/* Top Navigation Row */}
       <div className="flex items-center justify-between gap-4 mb-6">
@@ -201,7 +199,7 @@ export default function MatchDetailPage() {
                 <span>Manage</span>
               </button>
               <button
-                onClick={handleDeleteMatch}
+                onClick={() => setShowConfirmDelete(true)}
                 title="Delete Match"
                 className="p-2 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-gray-800 transition"
               >
@@ -628,6 +626,17 @@ export default function MatchDetailPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={showConfirmDelete}
+        title="Delete Match Fixture"
+        message={`Are you sure you want to delete the match between ${match?.team1} and ${match?.team2}? This action will permanently remove all scorecards and player records for this match.`}
+        confirmText="Delete Match"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={handleDeleteMatch}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
     </div>
   );
 }

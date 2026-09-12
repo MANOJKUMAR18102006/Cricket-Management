@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import connectionService from '../services/connectionService';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { 
   Users, 
   UserPlus, 
@@ -18,13 +20,26 @@ import {
   Flame,
   Target,
   Zap,
-  Activity
+  Activity,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function ConnectionsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('connections'); // 'connections' | 'received' | 'sent'
+  const queryTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    queryTab === 'received' || queryTab === 'sent' ? queryTab : 'connections'
+  );
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['connections', 'received', 'sent'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
   const [connections, setConnections] = useState([]);
   const [receivedRequests, setReceivedRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
@@ -32,6 +47,12 @@ export default function ConnectionsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -106,22 +127,29 @@ export default function ConnectionsPage() {
     }
   };
 
-  const handleRemoveConnection = async (id, playerName) => {
-    if (!window.confirm(`Are you sure you want to remove your connection with ${playerName}?`)) {
-      return;
-    }
-    setActionLoadingId(id);
-    try {
-      const res = await connectionService.removeConnection(id);
-      if (res.success) {
-        showFeedback('info', `Connection with ${playerName} removed.`);
-        fetchAllData();
-      }
-    } catch (err) {
-      showFeedback('error', err.response?.data?.message || 'Failed to remove connection.');
-    } finally {
-      setActionLoadingId(null);
-    }
+  const handleRemoveConnection = (id, playerName) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Remove Connection',
+      message: `Are you sure you want to remove your connection with ${playerName}? You will no longer be able to compare stats or view their private match history.`,
+      confirmText: 'Remove Connection',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        setActionLoadingId(id);
+        try {
+          const res = await connectionService.removeConnection(id);
+          if (res.success) {
+            toast.info(`Connection with ${playerName} removed.`);
+            fetchAllData();
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Failed to remove connection.');
+        } finally {
+          setActionLoadingId(null);
+        }
+      },
+    });
   };
 
   const getRoleBadge = (role) => {
@@ -140,7 +168,7 @@ export default function ConnectionsPage() {
   };
 
   return (
-    <div className="min-h-screen py-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
       
       {/* Header */}
       <div className="mb-8">
@@ -159,6 +187,13 @@ export default function ConnectionsPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              to="/profile"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-gray-900 border border-gray-800 hover:border-gray-700 transition flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>My Profile</span>
+            </Link>
             <Link
               to="/players"
               className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
@@ -269,7 +304,7 @@ export default function ConnectionsPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {connections.map((item) => {
                 const p = item.player;
                 if (!p) return null;
@@ -289,8 +324,8 @@ export default function ConnectionsPage() {
                           <span>{p.playingRole}</span>
                         </span>
 
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                          <UserCheck className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-sky-400 bg-sky-500/15 border border-sky-500/40 px-2 py-0.5 rounded-md">
+                          <UserCheck className="w-3 h-3 text-sky-400" />
                           <span>Connected</span>
                         </span>
                       </div>
@@ -372,7 +407,7 @@ export default function ConnectionsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {receivedRequests.map((item) => {
                 const p = item.player;
                 if (!p) return null;
@@ -472,7 +507,7 @@ export default function ConnectionsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {sentRequests.map((item) => {
                 const p = item.player;
                 if (!p) return null;
@@ -557,6 +592,17 @@ export default function ConnectionsPage() {
         </div>
       )}
 
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText="Remove Connection"
+        variant="danger"
+        loading={actionLoadingId !== null}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
