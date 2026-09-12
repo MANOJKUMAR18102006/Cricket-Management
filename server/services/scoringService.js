@@ -8,6 +8,14 @@ export const formatOvers = (legalBalls) => {
   return `${overs}.${balls}`;
 };
 
+export const getMaxOversPerBowler = (format, matchOvers = 20) => {
+  const f = (format || '').toUpperCase();
+  if (f === 'T10') return 2;
+  if (f === 'T20') return 4;
+  if (f === 'ODI') return 10;
+  return Math.max(1, Math.ceil(Number(matchOvers || 20) / 5));
+};
+
 /**
  * Replays all deliveries in sequence to compute 100% accurate batsman, bowler,
  * extras, and total score state. Guaranteed deterministic for record & undo.
@@ -29,7 +37,8 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
   const batsmenMap = new Map();
   if (Array.isArray(innings.batsmen)) {
     innings.batsmen.forEach((b, idx) => {
-      batsmenMap.set(b.name, {
+      const key = b.playerId ? String(b.playerId) : b.name.trim().toLowerCase();
+      batsmenMap.set(key, {
         name: b.name,
         playerId: b.playerId || null,
         runs: 0,
@@ -48,7 +57,8 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
   const bowlersMap = new Map();
   if (Array.isArray(innings.bowlers)) {
     innings.bowlers.forEach((b) => {
-      bowlersMap.set(b.name, {
+      const key = b.playerId ? String(b.playerId) : b.name.trim().toLowerCase();
+      bowlersMap.set(key, {
         name: b.name,
         playerId: b.playerId || null,
         legalBalls: 0,
@@ -63,11 +73,20 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
     });
   }
 
-  const getOrCreateBatsman = (name) => {
-    if (!name) return null;
-    if (!batsmenMap.has(name)) {
-      batsmenMap.set(name, {
-        name,
+  const getOrCreateBatsman = (name, playerId = null) => {
+    if (!name && !playerId) return null;
+    const key = playerId ? String(playerId) : name.trim().toLowerCase();
+    if (!batsmenMap.has(key)) {
+      // Check if another entry matches by name
+      for (const b of batsmenMap.values()) {
+        if (name && b.name.trim().toLowerCase() === name.trim().toLowerCase()) {
+          if (playerId && !b.playerId) b.playerId = playerId;
+          return b;
+        }
+      }
+      batsmenMap.set(key, {
+        name: name || 'Batter',
+        playerId: playerId || null,
         runs: 0,
         balls: 0,
         fours: 0,
@@ -78,14 +97,22 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
         battingOrder: batsmenMap.size + 1,
       });
     }
-    return batsmenMap.get(name);
+    return batsmenMap.get(key);
   };
 
-  const getOrCreateBowler = (name) => {
-    if (!name) return null;
-    if (!bowlersMap.has(name)) {
-      bowlersMap.set(name, {
-        name,
+  const getOrCreateBowler = (name, playerId = null) => {
+    if (!name && !playerId) return null;
+    const key = playerId ? String(playerId) : name.trim().toLowerCase();
+    if (!bowlersMap.has(key)) {
+      for (const b of bowlersMap.values()) {
+        if (name && b.name.trim().toLowerCase() === name.trim().toLowerCase()) {
+          if (playerId && !b.playerId) b.playerId = playerId;
+          return b;
+        }
+      }
+      bowlersMap.set(key, {
+        name: name || 'Bowler',
+        playerId: playerId || null,
         legalBalls: 0,
         overs: '0.0',
         maidens: 0,
@@ -96,23 +123,57 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
         noBalls: 0,
       });
     }
-    return bowlersMap.get(name);
+    return bowlersMap.get(key);
   };
 
-  // Tracking current positions
-  let currentStriker = innings.striker;
-  let currentNonStriker = innings.nonStriker;
-  let currentBowler = innings.currentBowler;
-
-  // Track over-by-over runs for maiden calculations: overIndex -> { bowler, runsConceded, isMaidenCandidate }
-  const overTracker = new Map();
+  // Determine immutable opening positions for the replay
+  let openingStriker = innings.openingStriker;
+  let openingStrikerId = innings.openingStrikerId || null;
+  let openingNonStriker = innings.openingNonStriker;
+  let openingNonStrikerId = innings.openingNonStrikerId || null;
 
   const deliveries = innings.deliveries || [];
 
+  if (!openingStriker && deliveries.length > 0 && deliveries[0].striker) {
+    openingStriker = deliveries[0].striker;
+    openingStrikerId = deliveries[0].strikerId || null;
+  }
+  if (!openingNonStriker && deliveries.length > 0 && deliveries[0].nonStriker) {
+    openingNonStriker = deliveries[0].nonStriker;
+    openingNonStrikerId = deliveries[0].nonStrikerId || null;
+  }
+
+  // Fallback to batsmen list by batting order
+  if (!openingStriker && innings.batsmen && innings.batsmen.length > 0) {
+    const b1 = innings.batsmen.find((b) => b.battingOrder === 1) || innings.batsmen[0];
+    openingStriker = b1.name;
+    openingStrikerId = b1.playerId || null;
+  }
+  if (!openingNonStriker && innings.batsmen && innings.batsmen.length > 1) {
+    const b2 = innings.batsmen.find((b) => b.battingOrder === 2) || innings.batsmen[1];
+    openingNonStriker = b2.name;
+    openingNonStrikerId = b2.playerId || null;
+  }
+
+  // Final fallback to initial pointers
+  if (!openingStriker) openingStriker = innings.striker;
+  if (!openingStrikerId) openingStrikerId = innings.strikerId || null;
+  if (!openingNonStriker) openingNonStriker = innings.nonStriker;
+  if (!openingNonStrikerId) openingNonStrikerId = innings.nonStrikerId || null;
+
+  // Initialize active positions for replay from opening pair
+  let currentStriker = { name: openingStriker, playerId: openingStrikerId };
+  let currentNonStriker = { name: openingNonStriker, playerId: openingNonStrikerId };
+  let currentBowler = { name: innings.currentBowler, playerId: innings.currentBowlerId || null };
+
+  // Track over-by-over runs for maiden calculations
+  const overTracker = new Map();
+
   deliveries.forEach((del) => {
-    const bman = getOrCreateBatsman(del.striker);
-    const nonStr = getOrCreateBatsman(del.nonStriker);
-    const bowl = getOrCreateBowler(del.bowler);
+    // Current striker on this ball
+    const bman = getOrCreateBatsman(del.striker || currentStriker.name, del.strikerId || currentStriker.playerId);
+    const nonStr = getOrCreateBatsman(del.nonStriker || currentNonStriker.name, del.nonStrikerId || currentNonStriker.playerId);
+    const bowl = getOrCreateBowler(del.bowler || currentBowler.name, del.bowlerId || currentBowler.playerId);
 
     const overIdx = del.over;
     if (!overTracker.has(overIdx)) {
@@ -120,15 +181,16 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
     }
     const currentOverData = overTracker.get(overIdx);
 
-    const runsScored = del.runsScored || 0;
-    const extraRuns = del.extraRuns || 0;
-    const totalDeliveryRuns = del.totalDeliveryRuns || 0;
+    const runsScored = Number(del.runsScored || 0);
+    const extraRuns = Number(del.extraRuns || 0);
+    const totalDeliveryRuns = Number(del.totalDeliveryRuns || 0);
     const isLegal = del.isLegal !== false;
 
     if (del.type === 'normal') {
       legalBalls++;
       totalRuns += runsScored;
 
+      // Normal batting delivery: ONLY the striker receives the runs & faces the ball!
       if (bman) {
         bman.runs += runsScored;
         bman.balls++;
@@ -143,14 +205,13 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       currentOverData.legalBalls++;
       currentOverData.runsConceded += runsScored;
 
-      // Strike rotation on odd runs
+      // Strike rotation on odd runs (1, 3, 5)
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     } else if (del.type === 'wide') {
-      // Wides are illegal deliveries (extra ball must be bowled)
       const wideCost = totalDeliveryRuns > 0 ? totalDeliveryRuns : 1;
       totalRuns += wideCost;
       extras.wides += wideCost;
@@ -162,20 +223,20 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       }
       currentOverData.runsConceded += wideCost;
 
-      // If additional running was completed on a wide and odd
+      // Striker does not face legal ball, 0 batter runs added
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     } else if (del.type === 'no_ball') {
-      // No Ball: 1 run penalty + any runs off bat
       const penalty = extraRuns > 0 ? extraRuns : 1;
       const nbTotal = penalty + runsScored;
       totalRuns += nbTotal;
       extras.noBalls += penalty;
       extras.total += penalty;
 
+      // Striker faces no ball and receives runs off bat
       if (bman) {
         bman.runs += runsScored;
         bman.balls++;
@@ -190,8 +251,8 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       currentOverData.runsConceded += nbTotal;
 
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     } else if (del.type === 'bye') {
@@ -200,18 +261,18 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       extras.byes += runsScored;
       extras.total += runsScored;
 
+      // Striker faced the ball, 0 batter runs added
       if (bman) {
         bman.balls++;
       }
       if (bowl) {
         bowl.legalBalls++;
-        // Byes are NOT credited to bowler runs conceded
       }
       currentOverData.legalBalls++;
 
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     } else if (del.type === 'leg_bye') {
@@ -220,18 +281,18 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       extras.legByes += runsScored;
       extras.total += runsScored;
 
+      // Striker faced the ball, 0 batter runs added
       if (bman) {
         bman.balls++;
       }
       if (bowl) {
         bowl.legalBalls++;
-        // Leg byes are NOT credited to bowler runs conceded
       }
       currentOverData.legalBalls++;
 
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     } else if (del.type === 'wicket') {
@@ -247,7 +308,6 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       if (bowl) {
         bowl.legalBalls++;
         bowl.runsConceded += runsScored;
-        // Run out does not credit the bowler with a wicket
         if (del.wicketType !== 'run_out' && del.wicketType !== 'retired') {
           bowl.wickets++;
         }
@@ -255,45 +315,87 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
       currentOverData.legalBalls++;
       currentOverData.runsConceded += runsScored;
 
-      // Mark the dismissed batsman as out
-      const dismissedName = del.dismissedPlayer || del.striker;
-      const dismissedBman = getOrCreateBatsman(dismissedName);
+      // Mark dismissed player
+      const dismissedPlayerId = del.dismissedPlayerId ? String(del.dismissedPlayerId) : null;
+      const dismissedName = (del.dismissedPlayer || del.striker || currentStriker.name || '').trim();
+
+      const dismissedBman = getOrCreateBatsman(dismissedName, dismissedPlayerId);
       if (dismissedBman) {
         dismissedBman.isOut = true;
-        const dismissalDetails = del.wicketType
-          ? `${del.wicketType} ${del.wicketType !== 'run_out' ? `b ${del.bowler}` : ''}`.trim()
-          : `b ${del.bowler}`;
+        let dismissalDetails = `b ${del.bowler}`;
+        if (del.wicketType === 'caught') {
+          dismissalDetails = del.fielder ? `c ${del.fielder} b ${del.bowler}` : `c & b ${del.bowler}`;
+        } else if (del.wicketType === 'bowled') {
+          dismissalDetails = `b ${del.bowler}`;
+        } else if (del.wicketType === 'lbw') {
+          dismissalDetails = `lbw b ${del.bowler}`;
+        } else if (del.wicketType === 'run_out') {
+          dismissalDetails = del.fielder ? `run out (${del.fielder})` : `run out`;
+        } else if (del.wicketType === 'stumped') {
+          dismissalDetails = del.fielder ? `st ${del.fielder} b ${del.bowler}` : `st b ${del.bowler}`;
+        } else if (del.wicketType === 'hit_wicket') {
+          dismissalDetails = `hit wicket b ${del.bowler}`;
+        } else if (del.wicketType === 'retired') {
+          dismissalDetails = `retired out`;
+        } else if (del.wicketType) {
+          dismissalDetails = `${del.wicketType} b ${del.bowler}`;
+        }
         dismissedBman.dismissal = dismissalDetails;
       }
 
-      // If new batsman came in
+      // Check if dismissed batter was striker
+      const isStrikerDismissed = dismissedPlayerId
+        ? (currentStriker.playerId && String(currentStriker.playerId) === dismissedPlayerId)
+        : (dismissedName.toLowerCase() === (currentStriker.name || '').toLowerCase());
+
       if (del.newBatsman) {
-        getOrCreateBatsman(del.newBatsman);
-        if (dismissedName === currentStriker) {
-          currentStriker = del.newBatsman;
+        const newBman = getOrCreateBatsman(del.newBatsman, del.newBatsmanId);
+        const newBatterObj = {
+          name: del.newBatsman,
+          playerId: del.newBatsmanId || newBman?.playerId || null,
+        };
+
+        if (isStrikerDismissed) {
+          currentStriker = newBatterObj;
         } else {
-          currentNonStriker = del.newBatsman;
+          currentNonStriker = newBatterObj;
         }
       }
 
-      // Rotate strike if odd runs occurred on the delivery
       if (runsScored % 2 !== 0) {
-        const temp = currentStriker;
-        currentStriker = currentNonStriker;
+        const temp = { ...currentStriker };
+        currentStriker = { ...currentNonStriker };
         currentNonStriker = temp;
       }
     }
 
-    // Check if legal ball concluded an over (6 legal balls in over)
+    // End of over: 6 legal deliveries bowled -> batsmen change ends
     if (isLegal && legalBalls > 0 && legalBalls % 6 === 0) {
-      // Strike change at end of legal over
-      const temp = currentStriker;
-      currentStriker = currentNonStriker;
+      const temp = { ...currentStriker };
+      currentStriker = { ...currentNonStriker };
       currentNonStriker = temp;
     }
 
-    currentBowler = del.bowler;
+    currentBowler = { name: del.bowler, playerId: del.bowlerId || null };
   });
+
+  // SAFETY CHECK: Striker and Non-Striker must NEVER be the same player
+  const isSameId = currentStriker.playerId && currentNonStriker.playerId && String(currentStriker.playerId) === String(currentNonStriker.playerId);
+  const isSameName = currentStriker.name && currentNonStriker.name && currentStriker.name.trim().toLowerCase() === currentNonStriker.name.trim().toLowerCase();
+
+  if (isSameId || isSameName) {
+    // Repair: pick next available un-dismissed batter
+    let alternate = null;
+    for (const b of batsmenMap.values()) {
+      if (!b.isOut && b.name.trim().toLowerCase() !== (currentStriker.name || '').trim().toLowerCase()) {
+        alternate = b;
+        break;
+      }
+    }
+    if (alternate) {
+      currentNonStriker = { name: alternate.name, playerId: alternate.playerId };
+    }
+  }
 
   // Calculate maidens from over tracker
   overTracker.forEach((data) => {
@@ -323,9 +425,16 @@ export const recalculateInnings = (innings, maxOvers = 20) => {
   innings.extras = extras;
   innings.batsmen = Array.from(batsmenMap.values()).sort((a, b) => a.battingOrder - b.battingOrder);
   innings.bowlers = Array.from(bowlersMap.values());
-  innings.striker = currentStriker || innings.striker;
-  innings.nonStriker = currentNonStriker || innings.nonStriker;
-  innings.currentBowler = currentBowler || innings.currentBowler;
+  innings.striker = currentStriker?.name || (typeof currentStriker === 'string' ? currentStriker : innings.striker);
+  innings.strikerId = currentStriker?.playerId || innings.strikerId || null;
+  innings.nonStriker = currentNonStriker?.name || (typeof currentNonStriker === 'string' ? currentNonStriker : innings.nonStriker);
+  innings.nonStrikerId = currentNonStriker?.playerId || innings.nonStrikerId || null;
+  innings.currentBowler = currentBowler?.name || (typeof currentBowler === 'string' ? currentBowler : innings.currentBowler);
+  innings.currentBowlerId = currentBowler?.playerId || innings.currentBowlerId || null;
+
+  const completedOversCount = Math.floor(legalBalls / 6);
+  const previousBowler = completedOversCount > 0 ? (overTracker.get(completedOversCount - 1)?.bowler || '') : '';
+  innings.previousBowler = previousBowler;
 
   // Detect Innings completion conditions:
   // 1. All Out (10 wickets)

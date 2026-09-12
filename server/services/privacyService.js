@@ -106,13 +106,14 @@ export const getConnectionStatus = async (viewerPlayerId, targetPlayerId) => {
  * @returns {Promise<Player>}
  */
 export const getPlayerForUser = async (user) => {
-  if (!user || !user._id) return null;
-  let player = await Player.findOne({ userId: user._id });
+  const userId = user?._id || user?.id;
+  if (!userId) return null;
+  let player = await Player.findOne({ userId });
   if (!player) {
     // Auto-create default player profile if none exists yet
     player = await Player.create({
-      userId: user._id,
-      displayName: user.username,
+      userId: userId,
+      displayName: user.username || 'Player',
       profileImage: user.profileImage || '',
       city: user.city || '',
       bio: user.bio || '',
